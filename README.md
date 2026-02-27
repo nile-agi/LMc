@@ -69,8 +69,8 @@ LMc is designed for the reality of computing in Africa and the Global South: low
 ### 1. Build
 
 ```bash
-git clone https://github.com/lmc-ai/lmc
-cd lmc
+git clone https://github.com/nile-agi/LMc.git
+cd LMc
 make
 ```
 
