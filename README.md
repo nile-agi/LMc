@@ -1,7 +1,54 @@
-# LMc — Local Model Compute
+<!-- <div align="center"> -->
 
-> **Edge-first AI inference for everyone.**
-> Pure C99 · No dependencies · Runs on any CPU · Built for Africa and the Global South.
+<!-- ![lmc logo](https://placehold.co/100x100/ffffff/000000/WebP?text=LMc&css={"borderRadius":"30px"})  -->
+<!-- 
+![LMx](https://placehold.co/100x100/ffffff/000000.WebP?text=LMc&css={"border-radius":"100px","fontSize":"120px","fontWeight":"bold","textAlign":"center"}) -->
+
+<!-- <img src="https://placehold.co/100x100/EEEEEE/000000/?text=LMc" alt="LMc" style="border-radius: 20px; overflow: hidden; display: block;" > -->
+
+<!-- </div> -->
+
+<!-- <div style="background: #0d1117; padding: 20px; border-radius: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #c9d1d9; max-width: 800px; margin: 0 auto;"> -->
+
+<table style="border: none; width: 100%; background: transparent;">
+  <tr>
+    <td style="width: 100px; vertical-align: top;">
+      <div style="
+        background: #eeeeee;
+        border-radius: 10px;
+        padding: 2px;
+        margin: 0 auto;
+        width: 100px;
+        height: 100px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 50px;
+        font-weight: bold;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      ">
+         <span style="color: #000000;">LM</span><span style="color: #808080;">c</span>
+      </div>
+    </td>
+    <td style="vertical-align: top;">
+      <p style="margin: 8px 0 16px 0; font-size: 18px; color: #8b949e; font-weight: 500;">
+        Local Model compute
+      </p>
+      <p style="margin: 0; font-size: 14px; color: #8b949e; line-height: 1.5;">
+       ← Local Machine learning Models computation on your laptop or in a data center - by custom research
+      </p>
+    </td>
+  </tr>
+</table>
+
+<!-- </div> -->
+
+<!-- # Local Model Compute -->
+
+<!-- > **Edge-first AI inference for everyone.**
+> Pure C99 · No dependencies · Runs on any CPU · Built for Africa and the Global South. -->
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![C99](https://img.shields.io/badge/C-C99-blue.svg)](https://en.wikipedia.org/wiki/C99)
@@ -11,7 +58,7 @@
 
 ## What is LMc?
 
-LMc is an open-source AI inference engine written in pure C99. It runs large language models (LLMs) locally on **any device** — no cloud, no GPU required.
+LMc is an AI inference engine written in pure C99. It runs machine learning models locally on **any device** — no cloud, no GPU required.
 
 LMc is designed for the reality of computing in Africa and the Global South: low-spec phones, aging laptops, shared computers, and limited bandwidth. Where llama.cpp is a toolkit, LMc is a standard — the **FFmpeg of AI inference**.
 
