@@ -10,7 +10,7 @@
 
 <!-- <div style="background: #0d1117; padding: 20px; border-radius: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #c9d1d9; max-width: 800px; margin: 0 auto;"> -->
 
-<table style="border: none; width: 100%; background: transparent;">
+<!-- <table style="border: none; width: 100%; background: transparent;">
   <tr>
     <td style="width: 100px; vertical-align: top;">
          <img src="https://placehold.co/100x100/eeeeee/000000/WebP?text=LMc" alt="LMc" style="border-radius: 16px; padding: 2px; margin: 0 auto; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: 100px; height: 100px; font-weight: bold; font-size: 100px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
@@ -24,7 +24,23 @@
       </p>
     </td>
   </tr>
-</table>
+</table> -->
+
+<div style="display: flex; align-items: flex-start; gap: 20px;">
+  <img 
+    src="https://placehold.co/100x100/eeeeee/000000/WebP?text=LMc" 
+    alt="LMc" 
+    style="border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: 100px; height: 100px;"
+  >
+  <div>
+    <p style="margin: 8px 0 16px 0; font-size: 18px; color: #8b949e; font-weight: 500;">
+      Local Model compute
+    </p>
+    <p style="margin: 0; font-size: 14px; color: #8b949e; line-height: 1.5;">
+      ← Local Machine learning Models computation on your laptop or in a data center - by custom research
+    </p>
+  </div>
+</div>
 
 <!-- </div> -->
 
@@ -32,6 +48,8 @@
 
 <!-- > **Edge-first AI inference for everyone.**
 > Pure C99 · No dependencies · Runs on any CPU · Built for Africa and the Global South. -->
+
+---
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![C99](https://img.shields.io/badge/C-C99-blue.svg)](https://en.wikipedia.org/wiki/C99)
