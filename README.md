@@ -27,11 +27,7 @@
 </table> -->
 
 <div style="display: flex; align-items: flex-start; gap: 20px; margin-bottom: 20px;">
-  <img 
-    src="https://placehold.co/100x100/eeeeee/000000/WebP?text=LMc" 
-    alt="LMc" 
-    style="border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: 100px; height: 100px;"
-  >
+  <img src="https://placehold.co/100x100/eeeeee/000000/WebP?text=LMc" alt="LMc" style="border-radius: 16px; padding: 2px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: 100px; height: 100px; font-weight: bold; font-size: 100px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
   <div>
     <p style="margin: 8px 0 16px 0; font-size: 18px; color: #8b949e; font-weight: 500;">
       Local Model compute
