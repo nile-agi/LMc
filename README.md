@@ -25,7 +25,7 @@
     </td>
   </tr>
 </table> -->
-
+<!-- 
 <div style="display: flex; align-items: flex-start; gap: 20px; margin-bottom: 20px;">
   <img 
     src="https://placehold.co/100x100/eeeeee/000000/WebP?text=LMc" 
@@ -39,6 +39,38 @@
     <p style="margin: 0; font-size: 14px; color: #8b949e; line-height: 1.5;">
       ← Local Machine learning Models computation on your laptop or in a data center - by custom research
     </p>
+  </div>
+</div> -->
+
+<div style="background-color: #0d1117; padding: 24px; border-radius: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #c9d1d9; max-width: 800px; margin: 20px auto;">
+  <div style="display: flex; align-items: flex-start; gap: 24px;">
+    <div style="
+      background: #ffffff;
+      border-radius: 16px;
+      width: 120px;
+      height: 120px;
+      min-width: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+      font-weight: bold;
+      color: #000000;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    ">
+      LMc
+    </div>
+    <div>
+      <h1 style="margin: 0; font-size: 32px; font-weight: 600; color: #ffffff;">
+        lmc-explore
+      </h1>
+      <p style="margin: 4px 0 12px 0; font-size: 18px; font-weight: 500; color: #8b949e;">
+        LMc
+      </p>
+      <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #c9d1d9;">
+        ← Local Machine learning Models computation on your laptop or in a data center - by custom research
+      </p>
+    </div>
   </div>
 </div>
 
