@@ -26,7 +26,7 @@
   </tr>
 </table> -->
 
-<div style="display: flex; align-items: flex-start; gap: 20px;">
+<div style="display: flex; align-items: flex-start; gap: 20px; margin-bottom: 20px;">
   <img 
     src="https://placehold.co/100x100/eeeeee/000000/WebP?text=LMc" 
     alt="LMc" 
