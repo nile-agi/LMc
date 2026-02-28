@@ -13,24 +13,7 @@
 <table style="border: none; width: 100%; background: transparent;">
   <tr>
     <td style="width: 100px; vertical-align: top;">
-      <div style="
-        background: #eeeeee;
-        border-radius: 10px;
-        padding: 2px;
-        margin: 0 auto;
-        width: 100px;
-        height: 100px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 50px;
-        font-weight: bold;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      ">
-         <span style="color: #000000;">LM</span><span style="color: #808080;">c</span>
-      </div>
+         <img src="https://placehold.co/100x100/eeeeee/000000/WebP?text=LMc" alt="LMc" style="border-radius: 16px; padding: 2px; margin: 0 auto; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: 100px; height: 100px; font-weight: bold; font-size: 100px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
     </td>
     <td style="vertical-align: top;">
       <p style="margin: 8px 0 16px 0; font-size: 18px; color: #8b949e; font-weight: 500;">
