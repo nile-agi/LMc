@@ -1,0 +1,106 @@
+/* models.c — Global model state, weight pointer assignment, cache/activation init. */
+#include "models.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* ── Global state definitions ─────────────────────────────────────────────── */
+ModelConfig  g_cfg      = {0};
+ModelWeights g_weights  = {0};
+KVCache      g_kv_cache = {NULL, NULL, 0};
+Activations  g_act      = {0};
+
+/* ── Parameter count (float32 equivalents) ────────────────────────────────── */
+size_t gpt2_total_params(void) {
+    const int D = CFG_D, V = CFG_V, S = CFG_S, L = CFG_L, F = CFG_F;
+    size_t n = (size_t)V * D + (size_t)S * D;   /* wte + wpe */
+    for (int l = 0; l < L; l++) {
+        n += 2*D;                    /* ln1  weight + bias  */
+        n += (size_t)3*D*D + 3*D;   /* qkv  weight + bias  */
+        n += (size_t)D*D + D;        /* attn_proj            */
+        n += 2*D;                    /* ln2  weight + bias  */
+        n += (size_t)F*D + F;        /* ffn_fc               */
+        n += (size_t)D*F + D;        /* ffn_proj             */
+    }
+    n += 2*D;   /* ln_f weight + bias */
+    return n;
+}
+
+/* ── Assign arena slices to weight pointers ───────────────────────────────── */
+void assign_weight_ptrs(void) {
+    const int D = CFG_D, V = CFG_V, S = CFG_S, L = CFG_L, F = CFG_F;
+
+    g_weights.wte = arena_alloc((size_t)V * D);
+    g_weights.wpe = arena_alloc((size_t)S * D);
+
+    g_weights.layers = (LayerWeights *)calloc((size_t)L, sizeof(LayerWeights));
+    if (!g_weights.layers)
+        LMC_FATAL("Cannot allocate LayerWeights array (%d layers)", L);
+
+    for (int l = 0; l < L; l++) {
+        LayerWeights *lw = &g_weights.layers[l];
+        lw->ln1_weight       = arena_alloc(D);
+        lw->ln1_bias         = arena_alloc(D);
+        lw->qkv_weight       = arena_alloc((size_t)3 * D * D);
+        lw->qkv_bias         = arena_alloc(3 * D);
+        lw->attn_proj_weight = arena_alloc((size_t)D * D);
+        lw->attn_proj_bias   = arena_alloc(D);
+        lw->ln2_weight       = arena_alloc(D);
+        lw->ln2_bias         = arena_alloc(D);
+        lw->ffn_fc_weight    = arena_alloc((size_t)F * D);
+        lw->ffn_fc_bias      = arena_alloc(F);
+        lw->ffn_proj_weight  = arena_alloc((size_t)D * F);
+        lw->ffn_proj_bias    = arena_alloc(D);
+    }
+
+    g_weights.ln_f_weight = arena_alloc(D);
+    g_weights.ln_f_bias   = arena_alloc(D);
+}
+
+/* ── KV cache ─────────────────────────────────────────────────────────────── *
+ * Head-major layout: [layer_offset + head * S * Dh + pos * Dh]
+ * This keeps each head's timeline contiguous, maximising cache reuse.
+ */
+void init_kv_cache(void) {
+    const size_t sz = (size_t)CFG_L * CFG_H * CFG_S * CFG_Dh;
+    g_kv_cache.k_cache = (float *)calloc(sz, sizeof(float));
+    g_kv_cache.v_cache = (float *)calloc(sz, sizeof(float));
+    g_kv_cache.seq_len = 0;
+    if (!g_kv_cache.k_cache || !g_kv_cache.v_cache)
+        LMC_FATAL("Cannot allocate KV cache (%.1f MB)",
+                  sz * 2 * 4.0 / (1024.0 * 1024.0));
+    LMC_INFO("KV cache: %.1f MB  (L=%d H=%d S=%d Dh=%d, head-major)",
+             sz * 2 * 4.0 / (1024.0 * 1024.0), CFG_L, CFG_H, CFG_S, CFG_Dh);
+}
+
+/* ── Activation scratch buffers ───────────────────────────────────────────── */
+void init_activations(void) {
+    const int D = CFG_D, V = CFG_V, F = CFG_F, H = CFG_H, S = CFG_S;
+
+#define ACT_ALLOC(field, n) \
+    do { g_act.field = (float *)malloc((size_t)(n) * sizeof(float)); \
+         if (!g_act.field) LMC_FATAL("OOM activation: " #field); } while(0)
+
+    ACT_ALLOC(x,           D);
+    ACT_ALLOC(x_norm,      D);
+    ACT_ALLOC(qkv,      3 * D);
+    ACT_ALLOC(attn_out,    D);
+    ACT_ALLOC(proj_out,    D);
+    ACT_ALLOC(ffn_hidden,  F);
+    ACT_ALLOC(ffn_out,     D);
+    ACT_ALLOC(logits,      V);
+    ACT_ALLOC(attn_scores, H * S);
+#undef ACT_ALLOC
+
+    /* ProbIdx sorting buffer for top-p sampling — size = vocab * (float+int) */
+    g_act.sorted_buf = malloc((size_t)V * (sizeof(float) + sizeof(int)));
+    if (!g_act.sorted_buf) LMC_FATAL("OOM sorted_buf");
+}
+
+void free_activations(void) {
+    free(g_act.x);        free(g_act.x_norm);    free(g_act.qkv);
+    free(g_act.attn_out); free(g_act.proj_out);  free(g_act.ffn_hidden);
+    free(g_act.ffn_out);  free(g_act.logits);    free(g_act.attn_scores);
+    free(g_act.sorted_buf);
+    memset(&g_act, 0, sizeof(g_act));
+}
