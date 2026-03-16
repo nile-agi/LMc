@@ -161,6 +161,22 @@ lmc/
 
 ---
 
+## FAQ
+
+**Q: Why C99 and not C++ or Rust?**
+C99 compiles on everything — old Android toolchains, embedded systems, RISC-V boards, 20-year-old GCC versions. It is the lingua franca of systems programming. C++ and Rust add value but also add friction for contributors and targets.
+
+**Q: How does this compare to llama.cpp?**
+llama.cpp is a mature, excellent project optimized for performance across many models and backends. LMc is optimized for *simplicity, portability, and accessibility*. The goal is not to beat llama.cpp on benchmarks but to be the easiest way to run AI on any hardware, with code that any developer can read and modify.
+
+**Q: Why focus on Africa?**
+Africa has the fastest-growing developer community in the world and the least access to cloud AI infrastructure. Most AI inference tools assume GPU access or reliable internet. LMc assumes neither.
+
+**Q: Can I use LMc in my project?**
+Yes. MIT license. Use it in commercial products, embed it in apps, fork it, do whatever you want. Attribution appreciated but not required.
+
+---
+
 ## License
 
 MIT — maximum adoption encouraged. See [LICENSE](LICENSE).
