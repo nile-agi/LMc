@@ -1,7 +1,47 @@
-# lmc — Lightweight Model Engine
+<div align="center">
+  <img src="./imgs/lm.c logo.png" alt="LMc" style = "width: 100px; heigth: 150px;">
+</div>
 
-A single-file-origin, modular C99 LLM inference engine.  
+<div align="center">
+  <p style="margin: 8px 0 16px 0; font-size: 18px; color: #8b949e; font-weight: 500;">
+    Local Model computing
+  </p>
+  <p style="margin: 0; font-size: 14px; color: #8b949e; line-height: 1.5;">
+    ← Local Machine learning Models computation on your low-end edge device ➝ by custom research
+  </p>
+</div>
+
+
+---
+
+<div align="center">
+
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+  [![C99](https://img.shields.io/badge/C-C99-blue.svg)](https://en.wikipedia.org/wiki/C99)
+  [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20iOS%20%7C%20Windows%20%7C%20Android%20%7C%20RPi-green.svg)](#platform-support)
+
+</div>
+
+---
+
+<div align="center">
+
+ᯓ➤ [📨 Email Us](mailto:info@nileagi.com)   ᯓ➤ [🌐. Visit](https://lmc.nileagi.com)  ᯓ➤ [[in] lınkedln](https://www.linkedin.com/posts/nile-agi/)
+
+</div>
+
+---
+
+LMc is an AI inference engine written in pure C99. It runs machine learning models locally on **any device** — no cloud, no GPU required.
+
 GGUF-native. Zero external dependencies. Runs on x86, ARM, Android, Windows.
+
+LMc is designed for the reality of computing in Africa and the Global South: low-spec phones, aging laptops, shared computers, and limited bandwidth. Where llama.cpp is a toolkit, LMc is a standard — the **FFmpeg of AI inference**.
+
+**Current status:** Proof of concept — GPT-2 124M working end-to-end. Architecture and extension points are production-ready. New models and hardware backends plug in cleanly.
+
+---
+
 
 ```
 ./lmc --model models/gpt2-xl.gguf \
