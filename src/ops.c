@@ -205,8 +205,13 @@ void transformer_block_forward(
     for (int i = 0; i < D; i++) x[i] += scratch_ffnout[i];
 }
 
+/* Forward declaration — implemented in ops_llama.c */
+float *llama_model_forward(int token_id, int pos);
+
 /* ── Full forward pass ────────────────────────────────────────────────────── */
 float *model_forward(int token_id, int pos) {
+    if (g_cfg.arch == ARCH_LLAMA)
+        return llama_model_forward(token_id, pos);
     const int D = CFG_D, V = CFG_V;
     float *x = g_act.x;
     float *tok_emb = g_weights.wte + (size_t)token_id * D;

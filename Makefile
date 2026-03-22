@@ -2,7 +2,6 @@
 # lmc — Lightweight Model Engine
 # Targets: Linux, macOS, Windows (MinGW/MSYS2)
 # ============================================================================
-
 CC      := gcc
 SRCDIR  := src
 SRCS    := $(SRCDIR)/utils.c \
@@ -10,12 +9,13 @@ SRCS    := $(SRCDIR)/utils.c \
            $(SRCDIR)/quant.c \
            $(SRCDIR)/gguf.c \
            $(SRCDIR)/ops.c \
+           $(SRCDIR)/ops_llama.c \
+           $(SRCDIR)/llama_tok.c \
            $(SRCDIR)/tokenizer.c \
            $(SRCDIR)/lmc.c
 CFLAGS  := -std=c99 -O3 -march=native -ffast-math -funroll-loops \
            -Wall -Wextra -Wno-unused-parameter -I$(SRCDIR)
 LIBS    := -lm
-
 # ── Platform detection ────────────────────────────────────────────────────────
 ifeq ($(OS), Windows_NT)
     TARGET      := lmc.exe
@@ -27,7 +27,6 @@ else
     TARGET      := lmc
     TARGET_OMP  := lmc_omp
     RM          := rm -f
-
     UNAME := $(shell uname -s)
     ifeq ($(UNAME), Darwin)
         HOMEBREW := $(shell brew --prefix 2>/dev/null || echo /usr/local)
@@ -49,36 +48,29 @@ else
     endif
 endif
 CC_OMP ?= $(CC)
-
 # ── Benchmark ─────────────────────────────────────────────────────────────────
 BENCH_SRCS := $(SRCDIR)/utils.c $(SRCDIR)/models.c $(SRCDIR)/quant.c \
-              $(SRCDIR)/gguf.c  $(SRCDIR)/ops.c    $(SRCDIR)/tokenizer.c \
+              $(SRCDIR)/gguf.c  $(SRCDIR)/ops.c    $(SRCDIR)/ops_llama.c \
+              $(SRCDIR)/llama_tok.c $(SRCDIR)/tokenizer.c \
               benchmarks/bench.c
-
 .PHONY: all omp bench bench-omp clean help
-
 ## all    — single-threaded build (default)
 all: $(TARGET)
-
 $(TARGET): $(SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
 	@echo "Built: $@"
-
 ## omp    — OpenMP multi-threaded build (recommended for Large / XL)
 omp: $(SRCS)
 	$(CC_OMP) $(CFLAGS) $(OMP_FLAGS) $^ -o $(TARGET_OMP) $(LIBS) $(OMP_LIBS)
 	@echo "Built: $(TARGET_OMP)"
-
 ## bench  — single-threaded benchmark binary
 bench: $(BENCH_SRCS)
 	$(CC) $(CFLAGS) $^ -o lmc_bench $(LIBS)
 	@echo "Built: lmc_bench"
-
 ## bench-omp — OpenMP benchmark binary
 bench-omp: $(BENCH_SRCS)
 	$(CC_OMP) $(CFLAGS) $(OMP_FLAGS) $^ -o lmc_bench_omp $(LIBS) $(OMP_LIBS)
 	@echo "Built: lmc_bench_omp"
-
 ## clean  — remove compiled binaries
 clean:
 ifeq ($(OS), Windows_NT)
@@ -86,7 +78,6 @@ ifeq ($(OS), Windows_NT)
 else
 	$(RM) lmc lmc_omp lmc_bench lmc_bench_omp
 endif
-
 ## help   — show all targets and example usage
 help:
 	@echo ""

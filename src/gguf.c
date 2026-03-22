@@ -3,9 +3,16 @@
 #include "models.h"
 #include "quant.h"
 #include "utils.h"
+#include "llama_tok.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* ── Global LLaMA tokenizer storage — matches extern declarations in llama_tok.h ── */
+// LlamaVocabEntry g_llama_vocab[LLAMA_TOK_MAX_VOCAB];
+// int             g_llama_vocab_n = 0;
+// int             g_llama_bos_id  = 1;
+// int             g_llama_eos_id  = 2;
 
 /* ── Low-level GGUF byte readers ──────────────────────────────────────────── */
 static void gguf_read_bytes(FILE *f, void *buf, size_t n) {
@@ -50,30 +57,41 @@ static void gguf_skip_value(FILE *f, uint32_t vtype) {
     }
 }
 
-/* ── Tensor name → weight pointer ─────────────────────────────────────────── */
+/* ── Tensor name → weight pointer ─────────────────────────────────────────── *
+ * Dispatches on g_cfg.arch for names shared between GPT-2 and LLaMA.        */
 static float **gguf_name_to_ptr(const char *name) {
-    if (!strcmp(name,"token_embd.weight"))   return &g_weights.wte;
-    if (!strcmp(name,"position_embd.weight"))return &g_weights.wpe;
-    if (!strcmp(name,"output_norm.weight"))  return &g_weights.ln_f_weight;
-    if (!strcmp(name,"output_norm.bias"))    return &g_weights.ln_f_bias;
-    if (!strcmp(name,"output.weight"))       return &g_weights.lm_head;
+    if (!strcmp(name,"token_embd.weight"))    return &g_weights.wte;
+    if (!strcmp(name,"position_embd.weight")) return &g_weights.wpe;
+    if (!strcmp(name,"output.weight"))        return &g_weights.lm_head;
+    if (!strcmp(name,"output_norm.weight"))
+        return (g_cfg.arch == ARCH_LLAMA) ? &g_weights.rms_f_weight
+                                           : &g_weights.ln_f_weight;
+    if (!strcmp(name,"output_norm.bias"))     return &g_weights.ln_f_bias;
     if (strncmp(name,"blk.",4)==0) {
         int layer = atoi(name+4);
         if (layer < 0 || layer >= CFG_L) return NULL;
         const char *rest = strchr(name+4,'.'); if (!rest) return NULL; rest++;
         LayerWeights *lw = &g_weights.layers[layer];
-        if (!strcmp(rest,"attn_norm.weight"))   return &lw->ln1_weight;
+        if (!strcmp(rest,"attn_norm.weight"))
+            return (g_cfg.arch == ARCH_LLAMA) ? &lw->rms_attn_weight : &lw->ln1_weight;
         if (!strcmp(rest,"attn_norm.bias"))     return &lw->ln1_bias;
         if (!strcmp(rest,"attn_qkv.weight"))    return &lw->qkv_weight;
         if (!strcmp(rest,"attn_qkv.bias"))      return &lw->qkv_bias;
+        if (!strcmp(rest,"attn_q.weight"))      return &lw->q_weight;
+        if (!strcmp(rest,"attn_k.weight"))      return &lw->k_weight;
+        if (!strcmp(rest,"attn_v.weight"))      return &lw->v_weight;
         if (!strcmp(rest,"attn_output.weight")) return &lw->attn_proj_weight;
         if (!strcmp(rest,"attn_output.bias"))   return &lw->attn_proj_bias;
-        if (!strcmp(rest,"ffn_norm.weight"))    return &lw->ln2_weight;
+        if (!strcmp(rest,"ffn_norm.weight"))
+            return (g_cfg.arch == ARCH_LLAMA) ? &lw->rms_ffn_weight : &lw->ln2_weight;
         if (!strcmp(rest,"ffn_norm.bias"))      return &lw->ln2_bias;
-        if (!strcmp(rest,"ffn_up.weight"))      return &lw->ffn_fc_weight;
+        if (!strcmp(rest,"ffn_up.weight"))
+            return (g_cfg.arch == ARCH_LLAMA) ? &lw->up_weight   : &lw->ffn_fc_weight;
         if (!strcmp(rest,"ffn_up.bias"))        return &lw->ffn_fc_bias;
-        if (!strcmp(rest,"ffn_down.weight"))    return &lw->ffn_proj_weight;
+        if (!strcmp(rest,"ffn_down.weight"))
+            return (g_cfg.arch == ARCH_LLAMA) ? &lw->down_weight : &lw->ffn_proj_weight;
         if (!strcmp(rest,"ffn_down.bias"))      return &lw->ffn_proj_bias;
+        if (!strcmp(rest,"ffn_gate.weight"))    return &lw->gate_weight;
     }
     return NULL;
 }
@@ -110,28 +128,114 @@ static void load_model_gguf(const char *path) {
              (unsigned long long)n_tensors, (unsigned long long)n_kv);
 
     /* Defaults — overridden by metadata keys below */
+    g_cfg.arch       = ARCH_UNKNOWN;
     g_cfg.vocab_size = MAX_VOCAB_SIZE;
     g_cfg.seq_len    = MAX_SEQ_LEN;
     g_cfg.n_layers   = 0;
     g_cfg.n_heads    = 0;
+    g_cfg.n_kv_heads = 0;
     g_cfg.embed_dim  = 0;
     g_cfg.ffn_dim    = 0;
+    g_cfg.rope_theta = 10000.0f;
+    g_cfg.norm_eps   = 1e-5f;
 
     for (uint64_t i = 0; i < n_kv; i++) {
-        char *key = gguf_read_string(f, NULL);
+        char    *key   = gguf_read_string(f, NULL);
         uint32_t vtype = gguf_u32(f);
+
         if (vtype == GGUF_MTYPE_UINT32) {
             uint32_t val = gguf_u32(f);
-            if      (!strcmp(key,"gpt2.block_count"))          g_cfg.n_layers = (int)val;
-            else if (!strcmp(key,"gpt2.attention.head_count")) g_cfg.n_heads  = (int)val;
-            else if (!strcmp(key,"gpt2.embedding_length"))     g_cfg.embed_dim= (int)val;
-            else if (!strcmp(key,"gpt2.feed_forward_length"))  g_cfg.ffn_dim  = (int)val;
-            else if (!strcmp(key,"gpt2.context_length"))       g_cfg.seq_len  = (int)val;
+            /* GPT-2 keys */
+            if      (!strcmp(key,"gpt2.block_count"))                    g_cfg.n_layers   = (int)val;
+            else if (!strcmp(key,"gpt2.attention.head_count"))           g_cfg.n_heads    = (int)val;
+            else if (!strcmp(key,"gpt2.embedding_length"))               g_cfg.embed_dim  = (int)val;
+            else if (!strcmp(key,"gpt2.feed_forward_length"))            g_cfg.ffn_dim    = (int)val;
+            else if (!strcmp(key,"gpt2.context_length"))                 g_cfg.seq_len    = (int)val;
+            else if (!strcmp(key,"gpt2.vocab_size"))                     g_cfg.vocab_size = (int)val;
+            /* LLaMA keys */
+            else if (!strcmp(key,"llama.block_count"))                   g_cfg.n_layers   = (int)val;
+            else if (!strcmp(key,"llama.attention.head_count"))          g_cfg.n_heads    = (int)val;
+            else if (!strcmp(key,"llama.embedding_length"))              g_cfg.embed_dim  = (int)val;
+            else if (!strcmp(key,"llama.feed_forward_length"))           g_cfg.ffn_dim    = (int)val;
+            else if (!strcmp(key,"llama.context_length"))                g_cfg.seq_len    = (int)val;
+            else if (!strcmp(key,"llama.attention.head_count_kv"))       g_cfg.n_kv_heads = (int)val;
+            else if (!strcmp(key,"llama.vocab_size"))                  { g_cfg.vocab_size = (int)val; g_llama_vocab_n = (int)val; }
+            else if (!strcmp(key,"tokenizer.ggml.bos_token_id"))         g_llama_bos_id   = (int)val;
+            else if (!strcmp(key,"tokenizer.ggml.eos_token_id"))         g_llama_eos_id   = (int)val;
+
+        } else if (vtype == GGUF_MTYPE_FLOAT32) {
+            float val = gguf_f32(f);
+            if      (!strcmp(key,"llama.rope.freq_base"))
+                g_cfg.rope_theta = val;
+            else if (!strcmp(key,"llama.attention.layer_norm_rms_epsilon"))
+                g_cfg.norm_eps   = val;
+
+        } else if (vtype == GGUF_MTYPE_STRING) {
+            char *val = gguf_read_string(f, NULL);
+            if (!strcmp(key,"general.architecture")) {
+                if      (!strcmp(val,"llama")) g_cfg.arch = ARCH_LLAMA;
+                else if (!strcmp(val,"gpt2"))  g_cfg.arch = ARCH_GPT2;
+            }
+            free(val);
+
+        } else if (vtype == GGUF_MTYPE_ARRAY) {
+            uint32_t et  = gguf_u32(f);
+            uint64_t cnt = gguf_u64(f);
+            if (!strcmp(key,"tokenizer.ggml.tokens") && et == GGUF_MTYPE_STRING) {
+                if ((int)cnt <= LLAMA_TOK_MAX_VOCAB) {
+                    g_llama_vocab_n = (int)cnt;
+                    for (uint64_t j = 0; j < cnt; j++) {
+                        char *s = gguf_read_string(f, NULL);
+                        strncpy(g_llama_vocab[j].text, s, LLAMA_TOK_MAX_PIECE-1);
+                        g_llama_vocab[j].text[LLAMA_TOK_MAX_PIECE-1] = '\0';
+                        free(s);
+                    }
+                } else {
+                    /* Vocab exceeds LLaMA buffer (e.g. GPT-2 has 50257).
+                     * Drain the strings and leave g_llama_vocab_n = 0.
+                     * GPT-2 uses its own tokenizer loaded from encoder.json. */
+                    for (uint64_t j = 0; j < cnt; j++)
+                        { char *s = gguf_read_string(f, NULL); free(s); }
+                }
+            } else if (!strcmp(key,"tokenizer.ggml.scores") && et == GGUF_MTYPE_FLOAT32) {
+                /* Only store scores when we successfully loaded the vocab */
+                for (uint64_t j = 0; j < cnt; j++) {
+                    float s = gguf_f32(f);
+                    if (g_llama_vocab_n > 0 && j < (uint64_t)g_llama_vocab_n)
+                        g_llama_vocab[j].score = s;
+                }
+            } else {
+                for (uint64_t j = 0; j < cnt; j++) gguf_skip_value(f, et);
+            }
+
         } else {
             gguf_skip_value(f, vtype);
         }
         free(key);
     }
+
+    /* Architecture resolution */
+    if (g_cfg.arch == ARCH_UNKNOWN)
+        g_cfg.arch = (g_cfg.n_kv_heads > 0) ? ARCH_LLAMA : ARCH_GPT2;
+    if (g_cfg.arch == ARCH_LLAMA && g_cfg.n_kv_heads == 0)
+        g_cfg.n_kv_heads = g_cfg.n_heads;
+    g_cfg.n_kv_groups = (g_cfg.n_kv_heads > 0)
+                      ? (g_cfg.n_heads / g_cfg.n_kv_heads) : 1;
+
+    /* Clamp GPT-2 vocab to 50257 when gpt2.vocab_size key is absent.
+     * All GPT-2 variants (Small/Medium/Large/XL) share the same 50257-token
+     * vocabulary. Without this, V stays at MAX_VOCAB_SIZE=128256 and
+     * sample_top_p samples tokens 50257-128255 which cannot be decoded.   */
+    if (g_cfg.arch == ARCH_GPT2 && g_cfg.vocab_size == MAX_VOCAB_SIZE)
+        g_cfg.vocab_size = 50257;
+
+    /* Clamp vocab to tokenizer size when llama.vocab_size key is absent     *
+     * (older GGUF files omit it; TinyLlama Q4_K_M is one such file).       *
+     * Without this, V stays at MAX_VOCAB_SIZE=128256 and the lm_head matmul *
+     * runs 4× too many rows — causing the 0.1 t/s performance bug.         */
+    if (g_cfg.arch == ARCH_LLAMA && g_llama_vocab_n > 0
+            && g_llama_vocab_n < g_cfg.vocab_size)
+        g_cfg.vocab_size = g_llama_vocab_n;
 
     if (g_cfg.n_layers==0 || g_cfg.n_heads==0 || g_cfg.embed_dim==0)
         LMC_FATAL("GGUF missing required arch metadata (L=%d H=%d D=%d)",
@@ -139,13 +243,20 @@ static void load_model_gguf(const char *path) {
     if (g_cfg.ffn_dim == 0) g_cfg.ffn_dim = 4 * g_cfg.embed_dim;
     g_cfg.head_dim = g_cfg.embed_dim / g_cfg.n_heads;
 
-    LMC_INFO("Architecture: L=%d H=%d D=%d F=%d Dh=%d V=%d S=%d",
-             CFG_L,CFG_H,CFG_D,CFG_F,CFG_Dh,CFG_V,CFG_S);
-    if      (CFG_L==12&&CFG_D== 768) LMC_INFO("Variant: GPT-2 Small  (124M)");
-    else if (CFG_L==24&&CFG_D==1024) LMC_INFO("Variant: GPT-2 Medium (345M)");
-    else if (CFG_L==36&&CFG_D==1280) LMC_INFO("Variant: GPT-2 Large  (774M)");
-    else if (CFG_L==48&&CFG_D==1600) LMC_INFO("Variant: GPT-2 XL    (1.5B)");
-    else                              LMC_INFO("Variant: Custom (%dL/%dD)",CFG_L,CFG_D);
+    if (g_cfg.arch == ARCH_LLAMA) {
+        LMC_INFO("Architecture: LLAMA  L=%d H=%d Hkv=%d D=%d F=%d Dh=%d V=%d S=%d",
+                 CFG_L, CFG_H, CFG_Hkv, CFG_D, CFG_F, CFG_Dh, CFG_V, CFG_S);
+        if (CFG_L==22 && CFG_D==2048) LMC_INFO("Variant: TinyLlama-1.1B");
+        else                           LMC_INFO("Variant: LLaMA-family (%dL/%dD)", CFG_L, CFG_D);
+    } else {
+        LMC_INFO("Architecture: GPT-2  L=%d H=%d D=%d F=%d Dh=%d V=%d S=%d",
+                 CFG_L,CFG_H,CFG_D,CFG_F,CFG_Dh,CFG_V,CFG_S);
+        if      (CFG_L==12&&CFG_D== 768) LMC_INFO("Variant: GPT-2 Small  (124M)");
+        else if (CFG_L==24&&CFG_D==1024) LMC_INFO("Variant: GPT-2 Medium (345M)");
+        else if (CFG_L==36&&CFG_D==1280) LMC_INFO("Variant: GPT-2 Large  (774M)");
+        else if (CFG_L==48&&CFG_D==1600) LMC_INFO("Variant: GPT-2 XL    (1.5B)");
+        else                              LMC_INFO("Variant: Custom (%dL/%dD)", CFG_L, CFG_D);
+    }
 
     /* Read tensor descriptors */
     const int max_tensors = CFG_L * GGUF_TENSORS_PER_LAYER + GGUF_TENSORS_GLOBAL + 4;
@@ -175,21 +286,30 @@ static void load_model_gguf(const char *path) {
     long data_start = (header_end + 31) / 32 * 32;
     fseek(f, data_start, SEEK_SET);
 
-    /* Allocate arena + weight pointers */
-    size_t total = gpt2_total_params();
-    LMC_INFO("Parameters: %zu  (%.1f MB float32)", total, total*4.0/(1024*1024));
-    const size_t lm_head_sz = (size_t)CFG_V * CFG_D;
-    arena_init(total + lm_head_sz);
-    assign_weight_ptrs();
-    g_weights.lm_head = arena_alloc(lm_head_sz);
-    memcpy(g_weights.lm_head, g_weights.wte, lm_head_sz * sizeof(float));
+    /* Allocate arena + weight pointers — architecture-aware */
+    if (g_cfg.arch == ARCH_LLAMA) {
+        size_t total = llama_total_params();
+        LMC_INFO("Parameters: %zu  (%.1f MB float32)", total, total*4.0/(1024*1024));
+        arena_init(total);
+        assign_weight_ptrs();
+        init_rope_cache();
+    } else {
+        size_t total = gpt2_total_params();
+        LMC_INFO("Parameters: %zu  (%.1f MB float32)", total, total*4.0/(1024*1024));
+        const size_t lm_head_sz = (size_t)CFG_V * CFG_D;
+        arena_init(total + lm_head_sz);
+        assign_weight_ptrs();
+        g_weights.lm_head = arena_alloc(lm_head_sz);
+        /* wte was sized with the now-corrected CFG_V — safe to copy fully */
+        memcpy(g_weights.lm_head, g_weights.wte, lm_head_sz * sizeof(float));
+    }
 
     /* Load tensors */
     int loaded = 0;
     for (uint64_t i = 0; i < n_tensors; i++) {
         GGUFTensor *t = &tensors[i];
         float **dst_ptr = gguf_name_to_ptr(t->name);
-        if (!dst_ptr) { LMC_INFO("Skip %-48s n=%zu", t->name, t->n_elements); continue; }
+        if (!dst_ptr || !*dst_ptr) { LMC_INFO("Skip %-48s n=%zu", t->name, t->n_elements); continue; }
         float *dst = *dst_ptr;
         fseek(f, data_start + (long)t->offset, SEEK_SET);
 
@@ -244,10 +364,13 @@ static void load_model_bin(const char *path) {
     if (magic   != MODEL_MAGIC)   LMC_FATAL("Bad magic 0x%08X", magic);
     if (version != MODEL_VERSION) LMC_FATAL("Version mismatch: got %u", version);
 
+    g_cfg.arch       = ARCH_GPT2;
     g_cfg.vocab_size = (int)vocab_size;
     g_cfg.seq_len    = (int)seq_len;
     g_cfg.n_layers   = (int)n_layers;
     g_cfg.n_heads    = (int)n_heads;
+    g_cfg.n_kv_heads = (int)n_heads;
+    g_cfg.n_kv_groups= 1;
     g_cfg.embed_dim  = (int)embed_dim;
     g_cfg.ffn_dim    = 4 * (int)embed_dim;
     g_cfg.head_dim   = (int)embed_dim / (int)n_heads;

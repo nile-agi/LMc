@@ -10,6 +10,8 @@
 #include "gguf.h"
 #include "ops.h"
 #include "tokenizer.h"
+#include "llama_tok.h"
+#include "chat_templates.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,29 +59,51 @@ static int sample_top_p(float *logits, float temperature, float top_p) {
 }
 
 /* ── Generation loop ──────────────────────────────────────────────────────── */
-static void generate(const char *prompt, int max_new_tokens,
-                     float temperature, float top_p) {
+/* ── LLaMA piece → printable bytes ─────────────────────────────────────── *
+ * llama_tok_piece() returns the raw piece with leading ▁ (U+2581, 3 bytes).*
+ * This helper replaces that prefix with a plain space.                     */
+static int llama_detok(int id, char *buf, int sz) {
+    const char *p = llama_tok_piece(id);
+    if (!p || !*p || id == g_llama_bos_id || id == g_llama_eos_id) return 0;
+    /* Byte fallback token: <0xNN> → raw byte value */
+    if (p[0]=='<' && p[1]=='0' && p[2]=='x' && p[5]=='>' && p[6]=='\0') {
+        unsigned int bv = 0;
+        if (sscanf(p+3, "%2X", &bv)==1 && sz>=2) {
+            buf[0]=(char)bv; buf[1]='\0'; return 1;
+        }
+        return 0;
+    }
+    /* Word boundary ▁ (U+2581) → plain space */
+    static const char BND[3] = {'\xe2','\x96','\x81'};
+    if (strncmp(p, BND, 3) == 0) {
+        p += 3; buf[0] = ' ';
+        int r = (int)strlen(p); if (r > sz-2) r = sz-2;
+        memcpy(buf+1, p, (size_t)r); buf[1+r] = '\0'; return 1+r;
+    }
+    int len = (int)strlen(p); if (len >= sz) len = sz-1;
+    memcpy(buf, p, (size_t)len); buf[len] = '\0'; return len;
+}
+
+static void generate(const char *prompt, const char *display_prefix,
+                     int max_new_tokens, float temperature, float top_p) {
     int prompt_tokens[MAX_SEQ_LEN];
-    int n_prompt = tokenize(&g_tokenizer, prompt, prompt_tokens, CFG_S);
+    int n_prompt;
+    if (g_cfg.arch == ARCH_LLAMA)
+        n_prompt = llama_tok_encode(prompt, 1, prompt_tokens, CFG_S);
+    else
+        n_prompt = tokenize(&g_tokenizer, prompt, prompt_tokens, CFG_S);
     if (n_prompt == 0) { LMC_ERROR("Empty prompt"); return; }
     LMC_INFO("Prompt tokens: %d", n_prompt);
-    printf("\n--- Generated Text ---\n%s", prompt); fflush(stdout);
 
     g_kv_cache.seq_len = 0;
     float *logits = NULL;
     clock_t t0 = clock();
 
-    printf("\n--- Generated Text ---\n"); fflush(stdout);
-
-    /* Print the prompt back through the tokenizer so byte encoding is consistent */
-    {
-        char dbuf[64];
-        for (int i = 0; i < n_prompt; i++) {
-            int dlen = detokenize_token(&g_tokenizer, prompt_tokens[i], dbuf, sizeof(dbuf));
-            if (dlen > 0) fwrite(dbuf, 1, (size_t)dlen, stdout);
-        }
-        fflush(stdout);
-    }
+    /* Print the original user prompt, then generated tokens flow after it */
+    if (display_prefix && *display_prefix)
+        printf("\n%s", display_prefix);
+    else
+        printf("\n");
 
     /* Prefill */
     for (int i = 0; i < n_prompt; i++) {
@@ -88,7 +112,8 @@ static void generate(const char *prompt, int max_new_tokens,
     }
 
     /* EOS token: use tokenizer's eos_id if set, fall back to GPT-2's 50256 */
-    int eos_id = (g_tokenizer.eos_id > 0) ? g_tokenizer.eos_id : 50256;
+    int eos_id = (g_cfg.arch == ARCH_LLAMA) ? g_llama_eos_id
+                 : (g_tokenizer.eos_id > 0) ? g_tokenizer.eos_id : 50256;
 
     /* Decode */
     int pos = n_prompt, tokens_gen = 0;
@@ -97,7 +122,9 @@ static void generate(const char *prompt, int max_new_tokens,
         if (pos >= CFG_S) { printf("\n[Context window full]\n"); break; }
         int next = sample_top_p(logits, temperature, top_p);
         if (next == eos_id) { printf("\n[EOS]\n"); break; }
-        int dec_len = detokenize_token(&g_tokenizer, next, decode_buf, sizeof(decode_buf));
+        int dec_len = (g_cfg.arch == ARCH_LLAMA)
+                   ? llama_detok(next, decode_buf, sizeof(decode_buf))
+                   : detokenize_token(&g_tokenizer, next, decode_buf, sizeof(decode_buf));
         if (dec_len > 0) { fwrite(decode_buf, 1, (size_t)dec_len, stdout); fflush(stdout); }
         logits = model_forward(next, pos);
         g_kv_cache.seq_len = pos + 1;
@@ -172,6 +199,7 @@ int main(int argc, char *argv[]) {
     printf("╚══════════════════════════════════════════════════╝\n\n");
 
     const char *prompt       = "Hello, world!";
+    const char *system_msg   = NULL;   /* NULL = use template default */
     const char *model_path   = NULL;
     const char *encoder_path = NULL;   /* resolved below after arg parsing  */
     const char *bpe_path     = NULL;
@@ -190,7 +218,8 @@ int main(int argc, char *argv[]) {
         else if (!strcmp(argv[i],"--n-predict")||!strcmp(argv[i],"-n")) NEXTARG(max_tokens,(int)atoi);
         else if (!strcmp(argv[i],"--temp")    ||!strcmp(argv[i],"-t"))  NEXTARG(temperature,(float)atof);
         else if (!strcmp(argv[i],"--top-p"))                            NEXTARG(top_p,(float)atof);
-        else if (!strcmp(argv[i],"--threads") ||!strcmp(argv[i],"-j"))  NEXTARG(n_threads,(int)atoi);
+        else if (!strcmp(argv[i],"--threads")||!strcmp(argv[i],"--thread")||!strcmp(argv[i],"-j")) NEXTARG(n_threads,(int)atoi);
+        else if (!strcmp(argv[i],"--system") ||!strcmp(argv[i],"-s"))  { if(i+1<argc)system_msg=argv[++i]; }
         else if (!strcmp(argv[i],"--encoder"))                          { if(i+1<argc)encoder_path=argv[++i]; }
         else if (!strcmp(argv[i],"--bpe"))                              { if(i+1<argc)bpe_path=argv[++i]; }
         else if (!strcmp(argv[i],"--help")    ||!strcmp(argv[i],"-h")) {
@@ -201,6 +230,7 @@ int main(int argc, char *argv[]) {
                    "  --temp    / -t  FLOAT    Temperature (default: 0.7)\n"
                    "  --top-p         FLOAT    Top-p nucleus (default: 0.9)\n"
                    "  --threads / -j  N        Number of threads (default: all)\n"
+                   "  --system  / -s  TEXT     System message (default: template built-in)\n"
                    "  --encoder       PATH     encoder.json path (default: encoder.json)\n"
                    "  --bpe           PATH     vocab.bpe path    (default: vocab.bpe)\n");
             return 0;
@@ -255,12 +285,36 @@ int main(int argc, char *argv[]) {
     rng_seed((uint64_t)time(NULL));
 
     /* ── Load and run ─────────────────────────────────────────────────────── */
-    load_model    (model_path);
-    load_tokenizer(encoder_path, bpe_path);
+    load_model(model_path);
+    if (g_cfg.arch == ARCH_LLAMA) {
+        llama_tok_init();
+    } else {
+        load_tokenizer(encoder_path, bpe_path);
+    }
     init_kv_cache ();
     init_activations();
 
-    generate(prompt, max_tokens, temperature, top_p);
+    /* ── Chat template: wrap user prompt with model-specific format ────── */
+    const char *display_prefix = prompt;   /* shown before generated text  */
+    static char templated_prompt[16384];
+    if (g_cfg.arch == ARCH_LLAMA) {
+        const ChatTemplate *tmpl = detect_template(model_path);
+        if (tmpl) {
+            LMC_INFO("Template: %s", tmpl->id);
+            if (build_prompt(templated_prompt, sizeof(templated_prompt),
+                             tmpl, system_msg, prompt) < 0)
+                LMC_FATAL("Prompt buffer overflow — shorten your message");
+            prompt = templated_prompt;
+        } else if (system_msg) {
+            /* Unknown model but user supplied a system message — best-effort */
+            snprintf(templated_prompt, sizeof(templated_prompt),
+                     "<|system|>\n%s\n<|user|>\n%s\n<|assistant|>\n",
+                     system_msg, prompt);
+            prompt = templated_prompt;
+        }
+    }
+
+    generate(prompt, display_prefix, max_tokens, temperature, top_p);
 
     /* ── Cleanup ──────────────────────────────────────────────────────────── */
     arena_free();
