@@ -39,6 +39,11 @@ Windows: use an MSYS2 / MinGW64 terminal.
 
 ### 2. Get a model
 
+|Models| Source| Available Variant|
+| :--- | :----:  | :---: |
+| GPT-2| Hugging Face -> [QuantFactory](https://huggingface.co/QuantFactory/gpt2-GGUF) | [gpt2-large-GGUF (346-898MB)](https://huggingface.co/QuantFactory/gpt2-large-GGUF), [gpt2-GGUF (81.2 - 178 MB) ](https://huggingface.co/QuantFactory/gpt2-GGUF/tree/main) |
+| | Hugging Face -> [mradermacher](https://huggingface.co/mradermacher)| [Small 0.2-0.4GB](https://huggingface.co/mradermacher/gpt2-GGUF), [Medium, 0.5-0.9GB](https://huggingface.co/mradermacher/gpt2-medium-GGUF), [Large, 0.4-1.8 GB](https://huggingface.co/mradermacher/gpt2-large-GGUF), [XLarge 1.0-3.4GB](https://huggingface.co/mradermacher/gpt2-xl-GGUF) |
+
 ```bash
 # GPT-2 Large Q4_K_M (~520 MB) from HuggingFace
 wget -P models/ \
