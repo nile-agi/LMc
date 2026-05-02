@@ -11,7 +11,6 @@
   </p>
 </div>
 
-
 ---
 
 <div align="center">
@@ -41,7 +40,6 @@ LMc is designed for the reality of computing in Africa and the Global South: low
 **Current status:** Proof of concept — GPT-2 124M working end-to-end. Architecture and extension points are production-ready. New models and hardware backends plug in cleanly.
 
 ---
-
 
 ```
 ./lmc --model models/gpt2-xl.gguf \
@@ -77,10 +75,22 @@ Windows: use MSYS2/MinGW64 terminal.
 
 ### 2. Download a model (GGUF)
 
+There are a lot of available source you can use to get the weight from, I find the following to be simple sources.
+
+You will probably find a lof of models version (I mean quantized version).
+
+|Models| Source| Available Variant|
+| :--- | :----:  | :---: |
+| GPT-2| Hugging Face -> [QuantFactory](https://huggingface.co/QuantFactory/gpt2-GGUF) | [gpt2-large-GGUF (346-898MB)](https://huggingface.co/QuantFactory/gpt2-large-GGUF), [gpt2-GGUF (81.2 - 178 MB) ](https://huggingface.co/QuantFactory/gpt2-GGUF/tree/main) |
+
+
+More sources will be added...
+
 ```bash
 # GPT-2 Large, Q4_K_M (~520 MB)
+# Download any variant, lets use the large version (not large enough though)
 wget -P models/ \
-  https://huggingface.co/ggml-org/gpt2-large-GGUF/resolve/main/gpt2-large-q4_k_m.gguf
+  https://huggingface.co/QuantFactory/gpt2-large-GGUF/resolve/main/gpt2-large.Q4_K_M.gguf
 
 # GPT-2 tokenizer files (required)
 wget https://openaipublic.blob.core.windows.net/gpt-2/encodings/main/encoder.json
@@ -89,9 +99,11 @@ wget https://openaipublic.blob.core.windows.net/gpt-2/encodings/main/vocab.bpe
 
 ### 3. Run
 
+You only need to be so keen with the model name match the store name, you can be responsible human
+
 ```bash
 ./lmc_omp \
-  --model   models/gpt2-large-q4_k_m.gguf \
+  --model   models/gpt2-large-Q4_K_M.gguf \
   --prompt  "Once upon a time" \
   --n-predict 200 --temp 0.8 --threads 4
 ```

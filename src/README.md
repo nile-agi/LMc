@@ -16,7 +16,7 @@ GGUF-native · zero external dependencies · runs on x86, ARM, Android, Windows.
 | | |
 |---|---|
 | **Architectures** | GPT-2 (Small / Medium / Large / XL), LLaMA / Mistral / Qwen family |
-| **File format** | GGUF v1–v3 (native); custom `.bin` (backward-compat) |
+| **File format** | GGUF v1-v3 (native); custom `.bin` (backward-compat) |
 | **Quantisation** | F32, F16, Q2\_K, Q3\_K, Q4\_0, Q4\_1, Q4\_K, Q5\_0, Q5\_1, Q5\_K, Q6\_K, Q8\_0, IQ3\_XXS, IQ3\_S, IQ4\_XS |
 | **Parallelism** | Optional OpenMP; single-threaded build also available |
 | **Platforms** | Linux, macOS, Windows (MinGW), Raspberry Pi, Android (NDK) |
@@ -42,7 +42,7 @@ Windows: use an MSYS2 / MinGW64 terminal.
 ```bash
 # GPT-2 Large Q4_K_M (~520 MB) from HuggingFace
 wget -P models/ \
-  https://huggingface.co/ggml-org/gpt2-large-GGUF/resolve/main/gpt2-large-q4_k_m.gguf
+  https://huggingface.co/QuantFactory/gpt2-large-GGUF/resolve/main/gpt2-large.Q4_K_M.gguf
 
 # Required tokenizer files for GPT-2
 wget https://openaipublic.blob.core.windows.net/gpt-2/encodings/main/encoder.json
@@ -55,7 +55,7 @@ LLaMA / Mistral GGUF files are available from [HuggingFace](https://huggingface.
 
 ```bash
 ./lmc_omp \
-  --model   models/gpt2-large-q4_k_m.gguf \
+  --model   models/gpt2-large.Q4_K_M.gguf \
   --prompt  "Once upon a time" \
   --n-predict 200 --temp 0.8 --threads 4
 ```
