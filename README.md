@@ -77,12 +77,11 @@ Windows: use MSYS2/MinGW64 terminal.
 
 There are a lot of available source you can use to get the weight from, I find the following to be simple sources.
 
-You will probably find a lof of models version (I mean quantized version).
+You will probably find a lot of models version (I mean quantized version).
 
 |Models| Source| Available Variant|
 | :--- | :----:  | :---: |
-| GPT-2| Hugging Face -> [QuantFactory](https://huggingface.co/QuantFactory/gpt2-GGUF) | [gpt2-large-GGUF (346-898MB)](https://huggingface.co/QuantFactory/gpt2-large-GGUF), [gpt2-GGUF (81.2 - 178 MB) ](https://huggingface.co/QuantFactory/gpt2-GGUF/tree/main) |
-| | Hugging Face -> [mradermacher](https://huggingface.co/mradermacher)| [Small 0.2-0.4GB](https://huggingface.co/mradermacher/gpt2-GGUF), [Medium, 0.5-0.9GB](https://huggingface.co/mradermacher/gpt2-medium-GGUF), [Large, 0.4-1.8 GB](https://huggingface.co/mradermacher/gpt2-large-GGUF), [XLarge 1.0-3.4GB](https://huggingface.co/mradermacher/gpt2-xl-GGUF) |
+|  GPT-2 | Hugging Face -> [mradermacher](https://huggingface.co/mradermacher)| [Small 0.2-0.4GB](https://huggingface.co/mradermacher/gpt2-GGUF), [Medium, 0.5-0.9GB](https://huggingface.co/mradermacher/gpt2-medium-GGUF), [Large, 0.4-1.8 GB](https://huggingface.co/mradermacher/gpt2-large-GGUF), [XLarge 1.0-3.4GB](https://huggingface.co/mradermacher/gpt2-xl-GGUF) |
 
 
 More sources will be added...
